@@ -1,0 +1,4 @@
+luoning_sentencediscussions_controller:
+    path: /sentence-discussions/{b64_data}
+    methods: ['GET']
+    defaults: { _controller: luoning.sentencediscussions.controller.main:handle }

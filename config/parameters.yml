@@ -1,0 +1,2 @@
+parameters:
+    luoning.sentencediscussions.tables.sentencediscussions_table: '%core.table_prefix%sentence_discussions'

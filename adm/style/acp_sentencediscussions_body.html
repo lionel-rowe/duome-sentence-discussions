@@ -1,0 +1,60 @@
+{% include 'overall_header.html' %}
+
+<h1>{{ lang('ACP_SENTENCEDISCUSSIONS_TITLE') }}</h1>
+
+{% if S_ERROR %}
+	<div class="errorbox">
+		<h3>{{ lang('WARNING') }}</h3>
+		<p>{{ ERROR_MSG }}</p>
+	</div>
+{% endif %}
+
+<form id="luoning_sentencediscussions_acp" name="luoning_sentencediscussions_acp" method="post" action="{{ U_ACTION }}">
+
+	<fieldset>
+		<legend>{{ lang('SETTINGS') }}</legend>
+		<dl>
+			<dt>
+				<label for="sentence_discussions_forum_id">{{ lang('ACP_SENTENCEDISCUSSIONS_FORUM_ID') ~ lang('COLON') }}</label>
+				<br />
+				<span>{{ lang('ACP_SENTENCEDISCUSSIONS_FORUM_ID_DESC')}}</span>
+				<br />
+			</dt>
+			<dd>
+				<input
+					type="number"
+					id="sentence_discussions_forum_id"
+					name="sentence_discussions_forum_id"
+					value="{{ SENTENCE_DISCUSSIONS_FORUM_ID }}"
+					min="-1"
+					step="1"
+				/>
+			</dd>
+		</dl>
+
+		<dl>
+			<dt>
+				<label for="sentence_discussions_forum_id_mapping">{{ lang('ACP_SENTENCEDISCUSSIONS_FORUM_ID_MAPPING') ~ lang('COLON') }}</label>
+				<br />
+				<span>{{ lang('ACP_SENTENCEDISCUSSIONS_FORUM_ID_MAPPING_DESC')}}</span>
+				<br />
+			</dt>
+			<dd>
+				<textarea
+					rows="30"
+					id="sentence_discussions_forum_id_mapping"
+					name="sentence_discussions_forum_id_mapping"
+				>{{ SENTENCE_DISCUSSIONS_FORUM_ID_MAPPING|e }}</textarea>
+			</dd>
+		</dl>
+	</fieldset>
+
+	<fieldset class="submit-buttons">
+		<input class="button1" type="submit" id="submit" name="submit" value="{{ lang('SUBMIT') }}" />&nbsp;
+		<input class="button2" type="submit" id="preview" name="preview" value="{{ lang('PREVIEW') }}" />
+		{{ S_FORM_TOKEN }}
+	</fieldset>
+
+</form>
+
+{% include 'overall_footer.html' %}

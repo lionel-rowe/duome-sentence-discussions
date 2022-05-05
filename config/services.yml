@@ -1,0 +1,59 @@
+imports:
+    - { resource: parameters.yml }
+
+services:
+    luoning.sentencediscussions.controller.main:
+        class: luoning\sentencediscussions\controller\main_controller
+        arguments:
+            - '@config'
+            - '@controller.helper'
+            - '@template'
+            - '@language'
+            - '@user'
+            - '@luoning.sentencediscussions.service'
+            - '@auth'
+            - '@request'
+            - '@symfony_request'
+            - '@dbal.conn'
+            - '@dispatcher'
+            - '%core.php_ext%'
+            - '%core.table_prefix%'
+            - '%core.root_path%'
+
+    luoning.sentencediscussions.controller.acp:
+        class: luoning\sentencediscussions\controller\acp_controller
+        arguments:
+            - '@config'
+            - '@config_text'
+            - '@language'
+            - '@log'
+            - '@request'
+            - '@template'
+            - '@user'
+            - '@luoning.sentencediscussions.service'
+            - '@dbal.conn'
+            - '%core.php_ext%'
+
+    luoning.sentencediscussions.service:
+        class: luoning\sentencediscussions\service
+        arguments:
+            - '@config'
+            - '@config_text'
+            - '@language'
+            - '@user'
+            - '@dbal.conn'
+            - '%core.table_prefix%'
+
+    luoning.sentencediscussions.listener:
+        class: luoning\sentencediscussions\event\main_listener
+        arguments:
+            - '@config'
+            - '@language'
+            - '@template'
+            - '@user'
+            - '@luoning.sentencediscussions.service'
+            - '@dbal.conn'
+            - '%core.table_prefix%'
+            - '%core.php_ext%'
+        tags:
+            - { name: event.listener }
