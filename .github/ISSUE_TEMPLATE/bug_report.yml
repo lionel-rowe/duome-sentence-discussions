@@ -1,0 +1,50 @@
+name: Bug Report
+description: File a bug report
+labels: ["bug"]
+assignees:
+  - lionel-rowe
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: textarea
+    id: what-went-wrong
+    attributes:
+      label: What went wrong?
+      description: What problem occurred
+      placeholder: |
+        For example: on clicking the button, a sentence discussion was generated for the previous sentence instead of the current one.
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen instead
+      placeholder: |
+        For example: the sentence discussion should have been generated for the correct sentence.
+    validations:
+      required: true
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Describe exactly how to reproduce the unexpected behavior
+      placeholder: |
+        For example:
+        1. Go to '...'
+        2. Click on '...'
+        3. Press '...'
+    validations:
+      required: true
+  - type: textarea
+    id: more-info
+    attributes:
+      label: Debug log, screenshots, and any other useful information
+      description: |
+        Upload the debug log file here. If applicable, add screenshots to help explain your problem.
+      placeholder: |
+        You can attach files and images by clicking this area then dragging the files into it.
+    validations:
+      required: false

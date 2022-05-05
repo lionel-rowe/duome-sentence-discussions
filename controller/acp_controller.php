@@ -45,16 +45,16 @@ class acp_controller
 		string $php_ext
 	)
 	{
-		$this->config	= $config;
+		$this->config = $config;
 		$this->config_text = $config_text;
-		$this->language	= $language;
-		$this->log		= $log;
-		$this->request	= $request;
-		$this->template	= $template;
-		$this->user		= $user;
-		$this->service	= $service;
-		$this->db	= $db;
-		$this->php_ext	= $php_ext;
+		$this->language = $language;
+		$this->log = $log;
+		$this->request = $request;
+		$this->template = $template;
+		$this->user = $user;
+		$this->service = $service;
+		$this->db = $db;
+		$this->php_ext = $php_ext;
 	}
 
 	private function handle_forum_id_mapping()

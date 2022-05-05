@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name			Duolingo Duome Sentence Discussions
 // @namespace		http://tampermonkey.net/
-// @version			0.1.12
+// @version			0.1.14
 // @description		Sentence discussions on Duome
 // @author			https://forum.duome.eu/memberlist.php?mode=viewprofile&u=66-luo-ning
 // @match			https://www.duolingo.com/
@@ -677,45 +677,46 @@
 			<div style="display: flex; justify-content: flex-end;">
 				<div class="close" style="font-size: 50px; cursor: pointer;">×</div>
 			</div>
-
-			<h2 style="color: #fff">Error report</h2>
-
-			<p>Copy the text below, paste it to <a style="color: cornflowerblue;" href="https://pastebin.com/" target="_blank">https://pastebin.com/</a>, then include a link to that paste in your error report.</p>
-
-			<textarea readonly style="background: #222; color: #ddd; width: 100%; height: 200px; font-family: monospace;"></textarea>
+			<h2 style="color: #fff">Report a bug 🐞</h2>
+			<p>To report a bug:</p>
+			<ol style="list-style: auto; padding: 0 0 18px 40px;">
+				<li>Click the button below to download debug logs.</li>
+				<li><a style="color: #64b5f6; text-decoration: underline;" href="https://github.com/lionel-rowe/duome-sentence-discussions/issues/new?assignees=lionel-rowe&labels=bug&template=bug_report.yml" target="_blank">Create a new GitHub issue</a>, uploading the debug log file and one or more screenshots if necessary, along with a description of the bug and how to reproduce it.</li>
+			</ol>
+			<p><a download role="button" style="display: inline-block; border-radius: 15px; border: 3px solid #8f0a23; padding: 10px; color: white; background: crimson; cursor: pointer; font-weight: bold;">Download debug logs</a></p>
+			<p>You’ll need to create a GitHub account first if you don’t already have one.</p>
 		`
-
-		const pre = div.querySelector('textarea')
 
 		const ignorables = [
 			'character',
 			'grader',
+			'vertices',
 			'challengeResponseTrackingProperties',
 		]
 
-		pre.value = [
+		const debugLog = [
 			'=== START DEBUG INFO ===',
 			`Script version: ${GM_info.script.version}`,
 			`User agent: ${navigator.userAgent}`,
 			`URL: ${window.location.href}`,
-			`Visible text: ${
-				JSON.stringify(document.querySelector('#root').innerText)
+			`Visible text: ${JSON.stringify(document.querySelector('#root').innerText)
 			}`,
 			`Current index: ${idx}`,
 			`Challenge data: ${JSON.stringify(
 				{
-					c: session?.challenges,
-					ac: session?.adaptiveChallenges,
-					aic: session?.adaptiveInterleavedChallenges,
+					challenges: session?.challenges,
+					adaptiveChallenges: session?.adaptiveChallenges,
+					adaptiveInterleavedChallenges: session?.adaptiveInterleavedChallenges,
 				},
 				(k, v) => ignorables.includes(k) ? undefined : v,
 			)}`,
 			'=== END DEBUG INFO ===',
 		].join('\n')
 
-		pre.onclick = function () {
-			this.select()
-		}
+		const downloadLink = div.querySelector('a[download]')
+
+		downloadLink.setAttribute('download', `debug-${Date.now()}.log`)
+		downloadLink.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(debugLog))
 
 		div.querySelector('.close').onclick = () => {
 			div.remove()
