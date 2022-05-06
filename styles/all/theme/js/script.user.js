@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name			Duolingo Duome Sentence Discussions
 // @namespace		http://tampermonkey.net/
-// @version			0.1.14
+// @version			0.1.15
 // @description		Sentence discussions on Duome
 // @author			https://forum.duome.eu/memberlist.php?mode=viewprofile&u=66-luo-ning
 // @match			https://www.duolingo.com/
@@ -653,7 +653,8 @@
 			e.ctrlKey && 'ctrl',
 			e.altKey && 'alt',
 			e.shiftKey && 'shift',
-			e.key,
+			// for example: "S" if e.code is "KeyS"
+			e.code.slice(3),
 		])
 
 	const bugReport = () => {
