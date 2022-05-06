@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name			Duolingo Duome Sentence Discussions
 // @namespace		http://tampermonkey.net/
-// @version			0.1.15
+// @version			0.1.16
 // @description		Sentence discussions on Duome
 // @author			https://forum.duome.eu/memberlist.php?mode=viewprofile&u=66-luo-ning
 // @match			https://www.duolingo.com/
@@ -28,12 +28,10 @@
 	 * 	pathname: string,
 	 * 	learningLang: string,
 	 * 	fromLang: string,
-	 * 	duolingoForumTopicId: number,
+	 * 	duolingoForumTopicId: number | null,
 	 * 	sentenceDiscussionId: string,
 	 * }} DuomeApiDto
 	 */
-
-	const IS_DEBUG = Boolean(localStorage.duomeDebugMode)
 
 	const console = (/** @param {Console} c */ (c) => {
 		for (const k in window.console) {
@@ -43,13 +41,14 @@
 		return c
 	})({})
 
-	const duomeUrl = IS_DEBUG
+	/** @param {string} dataStr */
+	const getDuomeUrl = (dataStr) => `${Boolean(localStorage.duomeDebugMode)
 		? 'http://localhost/forum'
-		: 'https://forum.duome.eu'
+		: 'https://forum.duome.eu'}/sentence-discussions/${dataStr}`
 
 	let idx = 0
 	let hasMadeMistakeThisRound = false
-	let sentenceDiscussionButtonAvailable = false
+	let sdIsAvailable = false
 
 	/**
 	 * @type {{
@@ -57,11 +56,7 @@
 	 * 	adaptiveChallenges?: Challenge[],
 	 * 	adaptiveInterleavedChallenges: {
 	 * 		challenges: Challenge[],
-	 * 			speakOrListenReplacementIndices: {
-	 * 				challenges: Challenge[],
-	 * 				speakOrListenReplacementIndices: (number | null)[]
-	 * 			},
-	 * 		}
+	 * 		speakOrListenReplacementIndices: (number | null)[]
 	 * } | null}
 	 */
 	let session = null
@@ -140,7 +135,7 @@
 			} else {
 				let handler
 
-				function readyStateChange(...args) {
+				const readyStateChange = (...args) => {
 					if (handler) {
 						if (handler.handleEvent) {
 							handler.handleEvent.apply(xhr, args)
@@ -152,8 +147,8 @@
 					setReadyStateChange()
 				}
 
-				function setReadyStateChange() {
-					setTimeout(function () {
+				const setReadyStateChange = () => {
+					setTimeout(() => {
 						if (xhr.onreadystatechange !== readyStateChange) {
 							handler = xhr.onreadystatechange
 							xhr.onreadystatechange = readyStateChange
@@ -221,8 +216,6 @@
 	}
 
 	/* === main logic === */
-
-	const getRoot = () => document.documentElement
 
 	const Selector = {
 		NextButton: '[data-test="player-next"]',
@@ -293,7 +286,7 @@
 					} else {
 						const sibling = addedBlame.querySelector('button')
 						renderBtnForCurrentChallenge(sibling)
-						sentenceDiscussionButtonAvailable = true
+						sdIsAvailable = true
 					}
 
 					if (isColor(color, colors.green)) {
@@ -328,26 +321,30 @@
 					// is next challenge
 					++idx
 					console.log(challenges[idx])
-					sentenceDiscussionButtonAvailable = false
+					sdIsAvailable = false
 				}
 			}
 		}
 	})
 
-	if (getRoot()) {
-		observer.observe(getRoot(), { childList: true, subtree: true })
-	} else {
-		console.warn('root element not found')
+	;(async () => {
+		let tries = 0
 
-		const interval = setInterval(() => {
-			if (getRoot()) {
-				observer.observe(getRoot(), { childList: true, subtree: true })
-				clearInterval(interval)
+		while (++tries <= 100) {
+			const root = document.body
+
+			if (root) {
+				observer.observe(root, { childList: true, subtree: true })
+				break
 			} else {
-				console.warn('root element not found')
+				await new Promise(res => setTimeout(res, 10))
 			}
-		}, 100)
-	}
+		}
+
+		if (tries > 1) {
+			console.warn(`tried to find root element ${tries} times`)
+		}
+	})()
 
 	addAjaxListener(async (res) => {
 		if (sessionsUrlMatcher.test(res.url)) {
@@ -357,10 +354,8 @@
 			hasMadeMistakeThisRound = false
 			console.log(session.challenges[idx])
 
-			if (IS_DEBUG) {
-				// trigger console warnings for unknown challenge types
-				session.challenges.forEach(getSentences)
-			}
+			// trigger console warnings for unknown challenge types
+			session.challenges.forEach(getSentences)
 		}
 	})
 
@@ -456,15 +451,14 @@
 	 * 	fromSentence: string,
 	 * 	learningSentenceAlternatives: string[],
 	 * 	fromSentenceAlternatives: string[],
-	 * }}
+	 * } | null}
 	 */
 	const getSentences = (challenge) => {
 		const [
 			[learningSentence, ...learningSentenceAlternatives],
 			[fromSentence, ...fromSentenceAlternatives],
-		] = getLearningAndFromSentences(challenge)
-			.map((x) =>
-				(Array.isArray(x) ? [...new Set(x)] : [x]).filter(Boolean))
+		] = getLearningAndFromSentences(challenge).map((x) =>
+			(Array.isArray(x) ? [...new Set(x)] : [x]).filter(Boolean))
 
 		if (!learningSentence) {
 			return null
@@ -479,14 +473,62 @@
 	}
 
 	/** @param {DuomeApiDto} data */
-	const toDuomeApiDataStr = (data) => encodeB64UrlSafe(
-		JSON.stringify(data, (_, val) => val == null ? null : val).slice(1, -1)
-	)
+	const toDuomeApiHref = (data) => {
+		let dataStr = ''
+
+		// clone to avoid side effects
+		data = JSON.parse(JSON.stringify(data))
+
+		// ensure within URL length limits, as determined from testing
+		while (true) {
+			dataStr = encodeB64UrlSafe(JSON.stringify(
+				data,
+				(_, v) => v == null ? null : v,
+			).slice(1, -1))
+
+			if (dataStr.length <= 4000) {
+				return getDuomeUrl(dataStr)
+			}
+
+			if (!data.learningSentenceAlternatives.length
+				&& !data.fromSentenceAlternatives.length) {
+				// is impossible to further reduce URL length
+				return null
+			}
+
+			data.learningSentenceAlternatives.pop()
+			data.fromSentenceAlternatives.pop()
+		}
+	}
 
 	/**
-	 * @param {Challenge} challenge
+	 * @param {DuomeApiDto} data
+	 * @returns {Promise<number | null>}
 	 */
-	const getDuomeDataForChallenge = async (challenge) => {
+	const getDuolingoDiscussionId = async (data) => {
+		const discussion = !data.sentenceDiscussionId
+			? null
+			: await fetch(
+				Object.assign(
+					new URL('https://www.duolingo.com/sentence/'
+						+ data.sentenceDiscussionId), {
+					search: new URLSearchParams(Object.entries({
+						learning_language: data.learningLang,
+						ui_language: data.fromLang,
+						_: new Date().valueOf()
+					})).toString()
+				}
+				).href, {
+				'headers': {
+					'accept': 'application/json, text/plain, */*',
+				},
+			}).then(x => x.json())
+
+		return discussion?.comment?.id ?? null
+	}
+
+	/** @param {Challenge} challenge */
+	const getDuomeApiDtoForChallenge = (challenge) => {
 		const url = new URL(location.href)
 		const { pathname } = url
 
@@ -504,72 +546,44 @@
 		const { challengeGeneratorIdentifier, sentenceDiscussionId } = challenge
 		const challengeGeneratorId = challengeGeneratorIdentifier.generatorId
 
-		const discussion = !sentenceDiscussionId
-			? null
-			: await fetch(
-				Object.assign(
-					new URL('https://www.duolingo.com/sentence/'
-						+ challenge.sentenceDiscussionId), {
-					search: new URLSearchParams(Object.entries({
-						learning_language: learningLang,
-						ui_language: fromLang,
-						_: new Date().valueOf()
-					})).toString()
-				}
-				).href, {
-				'headers': {
-					'accept': 'application/json, text/plain, */*',
-				},
-			}).then(x => x.json())
-
-		const duolingoForumTopicId = discussion?.comment?.id
-
 		const sentences = getSentences(challenge)
 
 		if (!sentences) {
 			return null
 		}
 
-		/** @type {DuomeApiDto} */
+		/** @type {Omit<DuomeApiDto, 'duolingoForumTopicId'>} */
 		const data = {
 			pathname,
 			learningLang,
 			fromLang,
-			duolingoForumTopicId,
 			sentenceDiscussionId,
 			challengeGeneratorId,
 			...sentences,
 		}
 
-		let dataStr = toDuomeApiDataStr(data)
-
-		// ensure within URL length limits, as determined from testing
-		while (dataStr.length > 4000) {
-			if (!data.learningSentenceAlternatives.length
-				&& !data.fromSentenceAlternatives.length) {
-				return null
-			}
-
-			data.learningSentenceAlternatives.pop()
-			data.fromSentenceAlternatives.pop()
-			dataStr = toDuomeApiDataStr(data)
-		}
-
-		return { data, href: `${duomeUrl}/sentence-discussions/${dataStr}` }
+		return data
 	}
 
 	/** @param {number} idx */
-	const openDuomeSentenceDiscussionByIdx = async (idx) => {
+	const openDuomeSdByIdx = async (idx) => {
 		const challenge = session.challenges[idx]
 
 		// https://stackoverflow.com/questions/2587677/avoid-browser-popup-blockers/25050893#25050893
-		const w = window.open('', '_blank')
-		w.document.write('Loading...')
+		const tab = window.open('', '_blank')
+		tab.document.write('Loading...')
 
-		const { data, href } = await getDuomeDataForChallenge(challenge)
+		const _data = getDuomeApiDtoForChallenge(challenge)
+
+		const data = {
+			..._data,
+			duolingoForumTopicId: await getDuolingoDiscussionId(_data)
+		}
+
+		const href = toDuomeApiHref(data)
 
 		if (!href) {
-			w.close()
+			tab.close()
 
 			setTimeout(() => {
 				alert('Failed to get challenge data')
@@ -579,20 +593,18 @@
 		} else {
 			console.log({ data })
 
-			w.location.href = href
+			tab.location.href = href
 		}
 	}
 
-	const openCurrentDuomeSentenceDiscussion = () =>
-		openDuomeSentenceDiscussionByIdx(idx)
+	const openCurrentDuomeSd = () => openDuomeSdByIdx(idx)
 
 	/** @param {HTMLButtonElement} sibling */
 	const renderBtnForCurrentChallenge = (sibling) => {
 		const challenge = session.challenges[idx]
 
-		const sentences = getSentences(challenge)
-
-		if (!sentences) {
+		// check challenge type is supported and can be used to create an SD
+		if (!getDuomeApiDtoForChallenge(challenge)) {
 			return null
 		}
 
@@ -613,18 +625,16 @@
 			button.textContent = 'Duome'
 		}
 
-		button.addEventListener('click', openCurrentDuomeSentenceDiscussion)
+		button.addEventListener('click', openCurrentDuomeSd)
 
 		sibling.parentElement.appendChild(button)
 	}
 
-	window.originalFetch = window.fetch
 	window.originalConsole = console
-
 	window.session = session
-	window.openDuomeSentenceDiscussionByIdx = openDuomeSentenceDiscussionByIdx
+	window.openDuomeSdByIdx = openDuomeSdByIdx
 	window.getSentences = getSentences
-	window.getDuomeDataForChallenge = getDuomeDataForChallenge
+	window.getDuomeDataForChallenge = getDuomeApiDtoForChallenge
 
 	const svgIcon = {
 		xml: `<svg xmlns="http://www.w3.org/2000/svg" width="61" height="61" viewBox="0 0 61 61" style="stroke: currentColor; stroke-width: 5.5; fill: none; height: 100%; width: 100%;">
@@ -644,24 +654,10 @@
 			return normalized === 'plus' ? '+' : normalized
 		}).sort().join('\0')
 
-	/** @param {KeyboardEvent} e */
-	const eventShortcut = (e) =>
-		/** @param {string | (string | undefined)[]} shortcut */
-		(shortcut) => normalizeCombo(
-			Array.isArray(shortcut) ? shortcut : shortcut.split('+'),
-		) === normalizeCombo([
-			e.ctrlKey && 'ctrl',
-			e.altKey && 'alt',
-			e.shiftKey && 'shift',
-			// for example: "S" if e.code is "KeyS"
-			e.code.slice(3),
-		])
-
 	const bugReport = () => {
 		modalOpen = true
 
-		const div = document.body.appendChild(
-			document.createElement('div'))
+		const div = document.body.appendChild(document.createElement('div'))
 
 		div.style = `
 			position: fixed;
@@ -674,6 +670,8 @@
 
 		document.body.appendChild(div)
 
+		const filename = `debug-${Date.now()}.log`
+
 		div.innerHTML = `
 			<div style="display: flex; justify-content: flex-end;">
 				<div class="close" style="font-size: 50px; cursor: pointer;">×</div>
@@ -684,7 +682,7 @@
 				<li>Click the button below to download debug logs.</li>
 				<li><a style="color: #64b5f6; text-decoration: underline;" href="https://github.com/lionel-rowe/duome-sentence-discussions/issues/new?assignees=lionel-rowe&labels=bug&template=bug_report.yml" target="_blank">Create a new GitHub issue</a>, uploading the debug log file and one or more screenshots if necessary, along with a description of the bug and how to reproduce it.</li>
 			</ol>
-			<p><a download role="button" style="display: inline-block; border-radius: 15px; border: 3px solid #8f0a23; padding: 10px; color: white; background: crimson; cursor: pointer; font-weight: bold;">Download debug logs</a></p>
+			<p><a download="${filename}" role="button" style="display: inline-block; border-radius: 15px; border: 3px solid #8f0a23; padding: 10px; color: white; background: crimson; cursor: pointer; font-weight: bold;">Download debug logs</a></p>
 			<p>You’ll need to create a GitHub account first if you don’t already have one.</p>
 		`
 
@@ -695,55 +693,55 @@
 			'challengeResponseTrackingProperties',
 		]
 
-		const debugLog = [
-			'=== START DEBUG INFO ===',
-			`Script version: ${GM_info.script.version}`,
-			`User agent: ${navigator.userAgent}`,
-			`URL: ${window.location.href}`,
-			`Visible text: ${JSON.stringify(document.querySelector('#root').innerText)
-			}`,
-			`Current index: ${idx}`,
-			`Challenge data: ${JSON.stringify(
-				{
-					challenges: session?.challenges,
-					adaptiveChallenges: session?.adaptiveChallenges,
-					adaptiveInterleavedChallenges: session?.adaptiveInterleavedChallenges,
-				},
-				(k, v) => ignorables.includes(k) ? undefined : v,
-			)}`,
-			'=== END DEBUG INFO ===',
-		].join('\n')
+		const href = URL.createObjectURL(new Blob([JSON.stringify({
+			scriptVersion: GM_info.script.version,
+			userAgent: navigator.userAgent,
+			url: window.location.href,
+			visibleText: document.querySelector('#root').innerText,
+			currentIndex: idx,
+			challenges: session?.challenges,
+			adaptiveChallenges: session?.adaptiveChallenges,
+			adaptiveInterleavedChallenges: session?.adaptiveInterleavedChallenges,
+		}, (k, v) => ignorables.includes(k) ? undefined : v)]))
 
-		const downloadLink = div.querySelector('a[download]')
+		div.querySelector('a[download]').setAttribute('href', href)
 
-		downloadLink.setAttribute('download', `debug-${Date.now()}.log`)
-		downloadLink.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(debugLog))
-
-		div.querySelector('.close').onclick = () => {
-			div.remove()
-			modalOpen = false
-		}
-
-		const keydownListener = (e) => {
-			if (e.key === 'Escape') {
+		/** @param {MouseEvent | KeyboardEvent} e */
+		const closeModal = (e) => {
+			if (e instanceof MouseEvent || e.key === 'Escape') {
 				div.remove()
 				modalOpen = false
-				window.removeEventListener('keydown', keydownListener)
+				URL.revokeObjectURL(href)
+
+				window.removeEventListener('keydown', closeModal)
 			}
 		}
 
-		window.addEventListener('keydown', keydownListener)
+		div.querySelector('.close').addEventListener('click', closeModal)
+		window.addEventListener('keydown', closeModal)
 	}
+
+	/**
+	 * @param {KeyboardEvent} e
+	 * @param {string | (string | undefined)[]} shortcut
+	 */
+	const isShortcut = (e, shortcut) => normalizeCombo(
+			Array.isArray(shortcut) ? shortcut : shortcut.split('+'),
+		) === normalizeCombo([
+			e.ctrlKey && 'ctrl',
+			e.altKey && 'alt',
+			e.shiftKey && 'shift',
+			// for example: "S" if e.code is "KeyS"
+			e.code.slice(3),
+		])
 
 	/** @param {KeyboardEvent} e */
 	window.addEventListener('keyup', (e) => {
-		const shortcut = eventShortcut(e)
-
-		if (shortcut('M') && sentenceDiscussionButtonAvailable) {
+		if (isShortcut(e, 'M') && sdIsAvailable) {
 			e.preventDefault()
 
-			openCurrentDuomeSentenceDiscussion()
-		} else if (shortcut('Shift+Alt+R') && !modalOpen) {
+			openCurrentDuomeSd()
+		} else if (isShortcut(e, 'Shift+Alt+R') && !modalOpen) {
 			e.preventDefault()
 
 			bugReport()
