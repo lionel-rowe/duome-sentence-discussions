@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name			Duolingo Duome Sentence Discussions
 // @namespace		http://tampermonkey.net/
-// @version			0.1.16
+// @version			0.1.17
 // @description		Sentence discussions on Duome
 // @author			https://forum.duome.eu/memberlist.php?mode=viewprofile&u=66-luo-ning
 // @match			https://www.duolingo.com/
@@ -12,11 +12,7 @@
 // ==/UserScript==
 
 ;(() => {
-	/**
-	 * @typedef {{
-	 * 	type: string,
-	 * }} Challenge
-	 */
+	/** @typedef {{ type: string }} Challenge */
 
 	/**
 	 * @typedef {{
@@ -371,21 +367,16 @@
 	 * @param {Challenge} x
 	 * @returns {[string | string[] | null, string | string[] | null]}
 	 */
-	const getLearningAndFromSentences = (x) => {
+	const getSrcAndTrgSentences = (x) => {
 		switch (x.type) {
-			case 'translate': {
-				const [src, trg] = [
+			case 'translate':
+				return [
 					x.prompt,
 					[x.correctSolutions[0], ...x.compactTranslations],
 				]
 
-				const [learning, from] =
-					x.metadata.from_language === x.metadata.source_language
-						? [trg, src]
-						: [src, trg]
-
-				return [learning, from]
-			}
+			case 'judge':
+				return [x.prompt, x.correctIndices.map(i => x.choices[i])]
 
 			case 'listen':
 			case 'listenTap':
@@ -433,6 +424,8 @@
 					'characterSelect',
 					'characterMatch',
 					'characterIntro',
+					'characterTrace',
+					'selectTranscription',
 				]
 
 				if (!ignorables.includes(x.type)) {
@@ -454,10 +447,17 @@
 	 * } | null}
 	 */
 	const getSentences = (challenge) => {
+		const [src, trg] = getSrcAndTrgSentences(challenge)
+
+		const [from, learning] = challenge.metadata.from_language
+			=== challenge.metadata.source_language
+				? [trg, src]
+				: [src, trg]
+
 		const [
 			[learningSentence, ...learningSentenceAlternatives],
 			[fromSentence, ...fromSentenceAlternatives],
-		] = getLearningAndFromSentences(challenge).map((x) =>
+		] = [from, learning].map((x) =>
 			(Array.isArray(x) ? [...new Set(x)] : [x]).filter(Boolean))
 
 		if (!learningSentence) {

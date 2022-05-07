@@ -2,7 +2,7 @@
     "name": "luoning/sentencediscussions",
     "type": "phpbb-extension",
     "description": "Sentence Discussions",
-    "version": "0.1.16-dev",
+    "version": "0.1.17-dev",
     "time": "2022-04-22",
     "license": "GPL-2.0-only",
     "authors": [
