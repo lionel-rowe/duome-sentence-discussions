@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name			Duolingo Duome Sentence Discussions
 // @namespace		http://tampermonkey.net/
-// @version			0.1.17
+// @version			0.1.18
 // @description		Sentence discussions on Duome
 // @author			https://forum.duome.eu/memberlist.php?mode=viewprofile&u=66-luo-ning
 // @match			https://www.duolingo.com/
@@ -634,7 +634,7 @@
 	window.session = session
 	window.openDuomeSdByIdx = openDuomeSdByIdx
 	window.getSentences = getSentences
-	window.getDuomeDataForChallenge = getDuomeApiDtoForChallenge
+	window.getDuomeApiDtoForChallenge = getDuomeApiDtoForChallenge
 
 	const svgIcon = {
 		xml: `<svg xmlns="http://www.w3.org/2000/svg" width="61" height="61" viewBox="0 0 61 61" style="stroke: currentColor; stroke-width: 5.5; fill: none; height: 100%; width: 100%;">
@@ -735,9 +735,14 @@
 			e.code.slice(3),
 		])
 
+	const isInputMode = () => ((el) => Boolean(el
+		&& (['INPUT', 'TEXTAREA'].includes(el.nodeName)
+			|| el.closest('[contenteditable]'))
+	))(document.activeElement)
+
 	/** @param {KeyboardEvent} e */
 	window.addEventListener('keyup', (e) => {
-		if (isShortcut(e, 'M') && sdIsAvailable) {
+		if (isShortcut(e, 'M') && sdIsAvailable && !isInputMode()) {
 			e.preventDefault()
 
 			openCurrentDuomeSd()
